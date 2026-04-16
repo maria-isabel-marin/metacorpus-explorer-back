@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum DomainType {
+  FUENTE
+  META
+  AMBOS
+}
+
+enum SemanticRelationType {
+  HIPERONIMIA
+  HIPONIMIA
+  COHIPONIMIA
+  MERONIMIA
+  HOLONIMIA
+  SINONIMIA
+  ANTONIMIA
+}
+
+model Corpus {
+  id                String   @id @default(uuid()) @db.Uuid
+  slug              String   @unique
+  nombre            String
+  descripcion       String?  @db.Text
+  idioma            String   @db.VarChar(8)
+  version           String
+  licencia          String?
+  doi               String?
+  autores           Json?
+  fecha_publicacion DateTime? @db.Date
+  activo            Boolean  @default(true)
+  metadatos_extra   Json?
+
+  expresiones_metaforicas MetaphoricalExpression[]
+  metaforas_conceptuales  ConceptualMetaphor[]
+  dominios                Domain[]
+  relaciones_semanticas   SemanticRelation[]
+  fuentes_textuales       TextualSource[]
+  categorias_gramaticales GrammaticalCategory[]
+
+  @@map("corpus")
+}
+
+model TextualSource {
+  id              String  @id @default(uuid()) @db.Uuid
+  corpus_id       String  @db.Uuid
+  titulo_1        String
+  titulo_2        String?
+  titulo_3        String?
+  autor           String?
+  anio            Int?
+  referencia_bib  String?
+
+  corpus                Corpus                  @relation(fields: [corpus_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  expresiones_metaforicas MetaphoricalExpression[]
+
+  @@unique([id, corpus_id])
+  @@index([corpus_id])
+  @@map("textual_source")
+}
+
+model GrammaticalCategory {
+  id          String @id @default(uuid()) @db.Uuid
+  corpus_id   String @db.Uuid
+  nombre      String
+  abreviatura String
+
+  corpus                  Corpus                  @relation(fields: [corpus_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  expresiones_metaforicas MetaphoricalExpression[]
+
+  @@unique([id, corpus_id])
+  @@unique([corpus_id, abreviatura])
+  @@index([corpus_id])
+  @@map("grammatical_category")
+}
+
+model Domain {
+  id               String     @id @default(uuid()) @db.Uuid
+  corpus_id        String     @db.Uuid
+  nombre           String
+  tipo             DomainType
+  descripcion      String?    @db.Text
+  dominio_padre_id String?    @db.Uuid
+
+  corpus             Corpus            @relation(fields: [corpus_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  dominio_padre      Domain?           @relation("DomainHierarchy", fields: [dominio_padre_id, corpus_id], references: [id, corpus_id], onDelete: Restrict, onUpdate: Cascade)
+  subdominios        Domain[]          @relation("DomainHierarchy")
+  metaforas_fuente   ConceptualMetaphor[] @relation("ConceptualMetaphorSourceDomain")
+  metaforas_meta     ConceptualMetaphor[] @relation("ConceptualMetaphorTargetDomain")
+  relaciones_origen  SemanticRelation[]   @relation("SemanticRelationOriginDomain")
+  relaciones_destino SemanticRelation[]   @relation("SemanticRelationTargetDomain")
+
+  @@unique([id, corpus_id])
+  @@unique([corpus_id, nombre, tipo])
+  @@index([corpus_id])
+  @@map("domain")
+}
+
+model ConceptualMetaphor {
+  id                String  @id @default(uuid()) @db.Uuid
+  corpus_id         String  @db.Uuid
+  nombre            String
+  descripcion       String? @db.Text
+  dominio_fuente_id String? @db.Uuid
+  dominio_meta_id   String? @db.Uuid
+  tipologia         String?
+
+  corpus                 Corpus                   @relation(fields: [corpus_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  dominio_fuente         Domain?                  @relation("ConceptualMetaphorSourceDomain", fields: [dominio_fuente_id, corpus_id], references: [id, corpus_id], onDelete: Restrict, onUpdate: Cascade)
+  dominio_meta           Domain?                  @relation("ConceptualMetaphorTargetDomain", fields: [dominio_meta_id, corpus_id], references: [id, corpus_id], onDelete: Restrict, onUpdate: Cascade)
+  expresiones_metaforicas MetaphoricalExpression[]
+
+  @@unique([id, corpus_id])
+  @@index([corpus_id])
+  @@map("conceptual_metaphor")
+}
+
+model SemanticRelation {
+  id                 String               @id @default(uuid()) @db.Uuid
+  corpus_id          String               @db.Uuid
+  dominio_origen_id  String               @db.Uuid
+  dominio_destino_id String               @db.Uuid
+  tipo_relacion      SemanticRelationType
+
+  corpus          Corpus @relation(fields: [corpus_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  dominio_origen  Domain @relation("SemanticRelationOriginDomain", fields: [dominio_origen_id, corpus_id], references: [id, corpus_id], onDelete: Restrict, onUpdate: Cascade)
+  dominio_destino Domain @relation("SemanticRelationTargetDomain", fields: [dominio_destino_id, corpus_id], references: [id, corpus_id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([id, corpus_id])
+  @@unique([corpus_id, dominio_origen_id, dominio_destino_id, tipo_relacion])
+  @@index([corpus_id])
+  @@map("semantic_relation")
+}
+
+model MetaphoricalExpression {
+  id                      String  @id @default(uuid()) @db.Uuid
+  corpus_id               String  @db.Uuid
+  id_registro             String
+  orden                   Int
+  fuente_textual_id       String  @db.Uuid
+  pagina                  Int?
+  expresion_metaforica    String  @db.Text
+  contexto                String? @db.Text
+  foco                    String?
+  foco_lematizado         String?
+  cat_gramatical_id       String? @db.Uuid
+  significado_contextual  String? @db.Text
+  significado_basico      String? @db.Text
+  metafora_conceptual_id  String? @db.Uuid
+  corresp_ontologicas     String? @db.Text
+  corresp_epistemicas     String? @db.Text
+  tipologia               String?
+  observaciones           String? @db.Text
+
+  corpus               Corpus              @relation(fields: [corpus_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  fuente_textual       TextualSource       @relation(fields: [fuente_textual_id, corpus_id], references: [id, corpus_id], onDelete: Restrict, onUpdate: Cascade)
+  categoria_gramatical GrammaticalCategory? @relation(fields: [cat_gramatical_id, corpus_id], references: [id, corpus_id], onDelete: Restrict, onUpdate: Cascade)
+  metafora_conceptual  ConceptualMetaphor? @relation(fields: [metafora_conceptual_id, corpus_id], references: [id, corpus_id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([id, corpus_id])
+  @@unique([corpus_id, id_registro])
+  @@index([corpus_id])
+  @@index([corpus_id, fuente_textual_id, orden])
+  @@unique([corpus_id, fuente_textual_id, orden])
+  @@map("metaphorical_expression")
+}

@@ -1,0 +1,24 @@
+{
+  "name": "metacorpus-explorer-back",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backend base para MetaCorpus Explorer con PostgreSQL + Prisma",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "prisma db seed"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "dotenv": "^16.4.5",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "prisma": "^7.0.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}
