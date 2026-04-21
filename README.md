@@ -147,5 +147,6 @@ Qué hace el CLI:
 - Normaliza encabezados y campos textuales.
 - Deduplica dominios (`FUENTE`/`META`) y metáforas conceptuales por corpus.
 - Preserva `orden` y valida unicidad por fuente textual dentro del archivo antes de insertar.
+- Si no existe columna `orden`, lo infiere desde el sufijo numérico de `id`/`id_registro` (ej: `CEV_123` -> `orden=123`).
 - Respeta idempotencia por `id_registro` + `corpus_id` (reimportación actualiza en lugar de duplicar).
 - Reporta métricas de importación en consola.

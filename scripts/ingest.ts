@@ -63,7 +63,7 @@ type ImportReport = {
 
 const HEADER_ALIASES = {
   id: ['id', 'id_registro', 'registro_id'],
-  orden: ['orden'],
+  orden: ['orden', 'n', 'numero', 'secuencia', 'orden_registro'],
   pagina: ['pagina', 'page'],
   titulo1: ['titulo_1', 'titulo1', 'titulo_principal'],
   titulo2: ['titulo_2', 'titulo2'],
@@ -161,6 +161,20 @@ function parseNullableInt(value: unknown, field: string, rowNumber: number): num
   return numeric;
 }
 
+function inferOrdenFromId(idRegistro: string): number | null {
+  const match = idRegistro.match(/(\d+)(?!.*\d)/);
+  if (!match) {
+    return null;
+  }
+
+  const numeric = Number(match[1]);
+  if (!Number.isInteger(numeric) || numeric <= 0) {
+    return null;
+  }
+
+  return numeric;
+}
+
 function cleanTipology(value: unknown): string | null {
   const raw = cleanString(value);
   if (!raw) {
@@ -250,8 +264,8 @@ function buildTextualSourceKey(
     .join('|');
 }
 
-function buildFallbackRegistroId(sourceKey: string, orden: number, rowNumber: number): string {
-  const hash = createHash('sha1').update(`${sourceKey}|${orden}|${rowNumber}`).digest('hex').slice(0, 12);
+function buildFallbackRegistroId(sourceKey: string, rowNumber: number): string {
+  const hash = createHash('sha1').update(`${sourceKey}|${rowNumber}`).digest('hex').slice(0, 12);
   return `AUTO_${hash}`;
 }
 
@@ -288,11 +302,6 @@ function readInputRows(filePath: string): InputRecord[] {
     const anio = parseNullableInt(safeAliasValue(row, HEADER_ALIASES.anio), 'anio', rowNumber);
     const referenciaBib = cleanString(safeAliasValue(row, HEADER_ALIASES.referenciaBib));
 
-    const orden = parseNullableInt(safeAliasValue(row, HEADER_ALIASES.orden), 'orden', rowNumber);
-    if (orden === null) {
-      throw new Error(`Fila ${rowNumber}: el campo orden es obligatorio`);
-    }
-
     const expresionMetaforica = cleanString(safeAliasValue(row, HEADER_ALIASES.expresionMetaforica));
     if (!expresionMetaforica) {
       throw new Error(`Fila ${rowNumber}: el campo expresion_metaforica es obligatorio`);
@@ -301,7 +310,17 @@ function readInputRows(filePath: string): InputRecord[] {
     const sourceKey = buildTextualSourceKey(titulo1, titulo2, titulo3, autor, anio, referenciaBib);
 
     const idRegistroRaw = cleanString(safeAliasValue(row, HEADER_ALIASES.id));
-    const idRegistro = idRegistroRaw ?? buildFallbackRegistroId(sourceKey, orden, rowNumber);
+    const idRegistro = idRegistroRaw ?? buildFallbackRegistroId(sourceKey, rowNumber);
+
+    const ordenFromSheet = parseNullableInt(safeAliasValue(row, HEADER_ALIASES.orden), 'orden', rowNumber);
+    const ordenFromId = inferOrdenFromId(idRegistro);
+    const orden = ordenFromSheet ?? ordenFromId;
+
+    if (orden === null) {
+      throw new Error(
+        `Fila ${rowNumber}: no se pudo determinar el orden. Incluye columna 'orden' o un id con sufijo numérico (ej: CEV_123).`
+      );
+    }
 
     return {
       rowNumber,

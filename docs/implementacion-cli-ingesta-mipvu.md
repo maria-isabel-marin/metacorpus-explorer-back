@@ -65,6 +65,7 @@ Esto permite mapear variaciones como `año`, `ano`, `year` al mismo campo.
 
 1. **Orden por fuente textual**
    - validacion previa en memoria: no se permiten filas duplicadas con la misma combinacion `(fuente_textual, orden)` dentro del mismo Excel.
+   - si el archivo no trae columna `orden`, se infiere desde el sufijo numerico del `id_registro` (ej. `CEV_45` -> `45`).
 
 2. **Id de registro**
    - si no existe `id_registro`, se genera `AUTO_<hash>` deterministico.
