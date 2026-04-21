@@ -41,13 +41,13 @@ Además:
 
 ### 3.3 Búsqueda full-text
 
-Se añadieron columnas `search_vector` generadas en:
+Se añadieron índices `GIN` de expresión con `to_tsvector('pg_catalog.spanish'::regconfig, ...)` en:
 - `metaphorical_expression`
 - `conceptual_metaphor`
 - `domain`
 - `textual_source`
 
-Y se crearon índices `GIN` para consultas de texto en español.
+Esta estrategia evita restricciones de inmutabilidad de columnas `GENERATED` y mantiene full-text nativo en español.
 
 ## 4. Archivos principales
 
@@ -86,7 +86,7 @@ DATABASE_URL="postgresql://postgres:postgres@localhost:5432/metacorpus_explorer?
 
 1. **Esquema Prisma creado con migraciones:** Sí.
 2. **Tabla `corpus` funcional:** Sí.
-3. **Índices full-text funcionales:** Sí (`GIN` + `tsvector`).
+3. **Índices full-text funcionales:** Sí (`GIN` sobre expresiones `to_tsvector('spanish', ...)`).
 4. **Índice compuesto de orden por fuente/corpus:** Sí.
 5. **UNIQUE(corpus_id, fuente_textual_id, orden):** Sí.
 6. **Seed con al menos 2 corpus:** Sí.

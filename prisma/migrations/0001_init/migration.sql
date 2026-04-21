@@ -36,16 +36,6 @@ CREATE TABLE "textual_source" (
   "autor" TEXT,
   "anio" INTEGER,
   "referencia_bib" TEXT,
-  "search_vector" tsvector GENERATED ALWAYS AS (
-    to_tsvector(
-      'spanish',
-      coalesce("titulo_1", '') || ' ' ||
-      coalesce("titulo_2", '') || ' ' ||
-      coalesce("titulo_3", '') || ' ' ||
-      coalesce("autor", '') || ' ' ||
-      coalesce("referencia_bib", '')
-    )
-  ) STORED,
   CONSTRAINT "textual_source_pkey" PRIMARY KEY ("id")
 );
 
@@ -64,14 +54,6 @@ CREATE TABLE "domain" (
   "tipo" "DomainType" NOT NULL,
   "descripcion" TEXT,
   "dominio_padre_id" UUID,
-  "search_vector" tsvector GENERATED ALWAYS AS (
-    to_tsvector(
-      'spanish',
-      coalesce("nombre", '') || ' ' ||
-      coalesce("descripcion", '') || ' ' ||
-      coalesce("tipo"::text, '')
-    )
-  ) STORED,
   CONSTRAINT "domain_pkey" PRIMARY KEY ("id")
 );
 
@@ -83,14 +65,6 @@ CREATE TABLE "conceptual_metaphor" (
   "dominio_fuente_id" UUID,
   "dominio_meta_id" UUID,
   "tipologia" TEXT,
-  "search_vector" tsvector GENERATED ALWAYS AS (
-    to_tsvector(
-      'spanish',
-      coalesce("nombre", '') || ' ' ||
-      coalesce("descripcion", '') || ' ' ||
-      coalesce("tipologia", '')
-    )
-  ) STORED,
   CONSTRAINT "conceptual_metaphor_pkey" PRIMARY KEY ("id")
 );
 
@@ -122,17 +96,6 @@ CREATE TABLE "metaphorical_expression" (
   "corresp_epistemicas" TEXT,
   "tipologia" TEXT,
   "observaciones" TEXT,
-  "search_vector" tsvector GENERATED ALWAYS AS (
-    to_tsvector(
-      'spanish',
-      coalesce("expresion_metaforica", '') || ' ' ||
-      coalesce("contexto", '') || ' ' ||
-      coalesce("foco", '') || ' ' ||
-      coalesce("significado_contextual", '') || ' ' ||
-      coalesce("significado_basico", '') || ' ' ||
-      coalesce("observaciones", '')
-    )
-  ) STORED,
   CONSTRAINT "metaphorical_expression_pkey" PRIMARY KEY ("id")
 );
 
@@ -140,7 +103,16 @@ CREATE UNIQUE INDEX "corpus_slug_key" ON "corpus" ("slug");
 
 CREATE UNIQUE INDEX "textual_source_id_corpus_id_key" ON "textual_source" ("id", "corpus_id");
 CREATE INDEX "textual_source_corpus_id_idx" ON "textual_source" ("corpus_id");
-CREATE INDEX "textual_source_search_vector_gin_idx" ON "textual_source" USING GIN ("search_vector");
+CREATE INDEX "textual_source_search_vector_gin_idx" ON "textual_source" USING GIN (
+  to_tsvector(
+    'pg_catalog.spanish'::regconfig,
+    coalesce("titulo_1", '') || ' ' ||
+    coalesce("titulo_2", '') || ' ' ||
+    coalesce("titulo_3", '') || ' ' ||
+    coalesce("autor", '') || ' ' ||
+    coalesce("referencia_bib", '')
+  )
+);
 
 CREATE UNIQUE INDEX "grammatical_category_id_corpus_id_key" ON "grammatical_category" ("id", "corpus_id");
 CREATE UNIQUE INDEX "grammatical_category_corpus_id_abreviatura_key" ON "grammatical_category" ("corpus_id", "abreviatura");
@@ -149,11 +121,24 @@ CREATE INDEX "grammatical_category_corpus_id_idx" ON "grammatical_category" ("co
 CREATE UNIQUE INDEX "domain_id_corpus_id_key" ON "domain" ("id", "corpus_id");
 CREATE UNIQUE INDEX "domain_corpus_id_nombre_tipo_key" ON "domain" ("corpus_id", "nombre", "tipo");
 CREATE INDEX "domain_corpus_id_idx" ON "domain" ("corpus_id");
-CREATE INDEX "domain_search_vector_gin_idx" ON "domain" USING GIN ("search_vector");
+CREATE INDEX "domain_search_vector_gin_idx" ON "domain" USING GIN (
+  to_tsvector(
+    'pg_catalog.spanish'::regconfig,
+    coalesce("nombre", '') || ' ' ||
+    coalesce("descripcion", '')
+  )
+);
 
 CREATE UNIQUE INDEX "conceptual_metaphor_id_corpus_id_key" ON "conceptual_metaphor" ("id", "corpus_id");
 CREATE INDEX "conceptual_metaphor_corpus_id_idx" ON "conceptual_metaphor" ("corpus_id");
-CREATE INDEX "conceptual_metaphor_search_vector_gin_idx" ON "conceptual_metaphor" USING GIN ("search_vector");
+CREATE INDEX "conceptual_metaphor_search_vector_gin_idx" ON "conceptual_metaphor" USING GIN (
+  to_tsvector(
+    'pg_catalog.spanish'::regconfig,
+    coalesce("nombre", '') || ' ' ||
+    coalesce("descripcion", '') || ' ' ||
+    coalesce("tipologia", '')
+  )
+);
 
 CREATE UNIQUE INDEX "semantic_relation_id_corpus_id_key" ON "semantic_relation" ("id", "corpus_id");
 CREATE UNIQUE INDEX "semantic_relation_unique_route_type_key" ON "semantic_relation" ("corpus_id", "dominio_origen_id", "dominio_destino_id", "tipo_relacion");
@@ -164,7 +149,17 @@ CREATE UNIQUE INDEX "metaphorical_expression_corpus_id_id_registro_key" ON "meta
 CREATE INDEX "metaphorical_expression_corpus_id_idx" ON "metaphorical_expression" ("corpus_id");
 CREATE INDEX "metaphorical_expression_corpus_id_fuente_textual_id_orden_idx" ON "metaphorical_expression" ("corpus_id", "fuente_textual_id", "orden");
 CREATE UNIQUE INDEX "metaphorical_expression_corpus_id_fuente_textual_id_orden_key" ON "metaphorical_expression" ("corpus_id", "fuente_textual_id", "orden");
-CREATE INDEX "metaphorical_expression_search_vector_gin_idx" ON "metaphorical_expression" USING GIN ("search_vector");
+CREATE INDEX "metaphorical_expression_search_vector_gin_idx" ON "metaphorical_expression" USING GIN (
+  to_tsvector(
+    'pg_catalog.spanish'::regconfig,
+    coalesce("expresion_metaforica", '') || ' ' ||
+    coalesce("contexto", '') || ' ' ||
+    coalesce("foco", '') || ' ' ||
+    coalesce("significado_contextual", '') || ' ' ||
+    coalesce("significado_basico", '') || ' ' ||
+    coalesce("observaciones", '')
+  )
+);
 
 ALTER TABLE "textual_source"
   ADD CONSTRAINT "textual_source_corpus_id_fkey"

@@ -76,7 +76,15 @@ WHERE tablename = 'metaphorical_expression'
 ```sql
 SELECT id, expresion_metaforica
 FROM metaphorical_expression
-WHERE search_vector @@ plainto_tsquery('spanish', 'democracia cimientos');
+WHERE to_tsvector(
+  'pg_catalog.spanish'::regconfig,
+  coalesce(expresion_metaforica, '') || ' ' ||
+  coalesce(contexto, '') || ' ' ||
+  coalesce(foco, '') || ' ' ||
+  coalesce(significado_contextual, '') || ' ' ||
+  coalesce(significado_basico, '') || ' ' ||
+  coalesce(observaciones, '')
+) @@ plainto_tsquery('spanish', 'democracia cimientos');
 ```
 
 ### 5.4 Aislamiento multi-tenant por `corpus_id` en FKs
