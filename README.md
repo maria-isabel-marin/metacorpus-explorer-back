@@ -113,3 +113,39 @@ ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position;
 
 - El `url` ya no se define en `schema.prisma`; se configura en `prisma.config.ts`.
 - El cliente Prisma se instancia con adapter PostgreSQL (`@prisma/adapter-pg`).
+
+## 8) CLI de ingestión MIPVU (Excel)
+
+El proyecto incluye un script administrativo en TypeScript que **no forma parte del runtime de exploración**.
+
+Archivo:
+
+- `scripts/ingest.ts`
+
+Dependencias requeridas (ya declaradas en `package.json`):
+
+- `ts-node`
+- `typescript`
+- `xlsx`
+
+Ejemplos de uso:
+
+```bash
+npx ts-node scripts/ingest.ts --file corpus.xlsx --corpus cev-amazonia --name "CEV Amazonia" --license "CC-BY-4.0"
+npx ts-node scripts/ingest.ts --file corpus2.xlsx --corpus cev-pacifico --name "CEV Pacífico"
+```
+
+También disponible como script npm:
+
+```bash
+npm run ingest -- --file corpus.xlsx --corpus cev-amazonia --name "CEV Amazonia"
+```
+
+Qué hace el CLI:
+
+- Lee `.xlsx` (primera hoja).
+- Normaliza encabezados y campos textuales.
+- Deduplica dominios (`FUENTE`/`META`) y metáforas conceptuales por corpus.
+- Preserva `orden` y valida unicidad por fuente textual dentro del archivo antes de insertar.
+- Respeta idempotencia por `id_registro` + `corpus_id` (reimportación actualiza en lugar de duplicar).
+- Reporta métricas de importación en consola.
