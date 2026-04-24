@@ -192,3 +192,45 @@ Devuelve:
 - `doi`
 
 Si el corpus no existe o no está activo, responde `404`.
+
+## 10) API REST de expresiones metafóricas (scoped a corpus)
+
+Todos los endpoints están aislados por corpus usando `slug` y `corpus_id`.
+
+### 10.1 Endpoints
+
+- `GET /api/v1/corpora/{slug}/expressions`
+  - listado paginado (`limit`, `offset`)
+  - filtros combinables: `metafora`, `dominio_fuente`, `dominio_meta`, `tipologia`, `cat_gramatical`, `fuente`
+  - ordenamiento: `sort=orden|id` y `order=asc|desc`
+
+- `GET /api/v1/corpora/{slug}/expressions/{id}`
+  - detalle completo de expresión (incluye `orden`)
+
+- `GET /api/v1/corpora/{slug}/expressions/{id}/nearby?range=5`
+  - expresiones adyacentes por `orden` en la misma `fuente_textual`
+
+- `GET /api/v1/corpora/{slug}/expressions/search?q={query}`
+  - búsqueda full-text (`expresion_metaforica`, `contexto`, `foco`)
+
+- `GET /api/v1/corpora/{slug}/expressions/concordance?q={query}`
+  - concordancia KWIC
+
+### 10.2 JSON-LD y OpenAPI
+
+- Las respuestas de expresiones se devuelven en formato JSON-LD (`@context`, `@type`).
+- Especificación OpenAPI generada con `swagger-jsdoc`:
+
+```http
+GET /api/v1/openapi.json
+```
+
+Guía de pruebas de aceptación:
+
+- `docs/validacion-aceptacion-api-expresiones.md`
+
+Smoke test automatizado (con la API corriendo):
+
+```bash
+npm run smoke:expressions-api
+```
