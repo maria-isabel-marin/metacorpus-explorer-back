@@ -63,6 +63,490 @@ function buildCitation(corpus: {
   return `${authorsText} (${year}). ${corpus.nombre} (v${corpus.version}).${doiText}`.trim();
 }
 
+function parseNumberParam(value: unknown, fallback: number, min = 0, max = Number.MAX_SAFE_INTEGER): number {
+  if (typeof value !== 'string' || !value.trim()) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(parsed, min), max);
+}
+
+function parseStringParam(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
+async function findActiveCorpusBySlug(slug: string): Promise<{ id: string; slug: string; nombre: string } | null> {
+  return prisma.corpus.findFirst({
+    where: {
+      slug,
+      activo: true
+    },
+    select: {
+      id: true,
+      slug: true,
+      nombre: true
+    }
+  });
+}
+
+app.get('/api/v1/corpora/:slug/metaphors', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const limit = parseNumberParam(req.query.limit, 20, 1, 100);
+    const offset = parseNumberParam(req.query.offset, 0, 0);
+    const dominioFuente = parseStringParam(req.query.dominio_fuente);
+    const dominioMeta = parseStringParam(req.query.dominio_meta);
+    const tipologia = parseStringParam(req.query.tipologia);
+
+    const where: Record<string, unknown> = {
+      corpus_id: corpus.id
+    };
+
+    if (tipologia) {
+      where.tipologia = { contains: tipologia, mode: 'insensitive' };
+    }
+
+    if (dominioFuente) {
+      where.dominio_fuente = {
+        is: {
+          nombre: { contains: dominioFuente, mode: 'insensitive' }
+        }
+      };
+    }
+
+    if (dominioMeta) {
+      where.dominio_meta = {
+        is: {
+          nombre: { contains: dominioMeta, mode: 'insensitive' }
+        }
+      };
+    }
+
+    const [total, metaphors] = await Promise.all([
+      prisma.conceptualMetaphor.count({ where }),
+      prisma.conceptualMetaphor.findMany({
+        where,
+        skip: offset,
+        take: limit,
+        orderBy: [{ nombre: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          nombre: true,
+          descripcion: true,
+          tipologia: true,
+          dominio_fuente: {
+            select: {
+              id: true,
+              nombre: true,
+              tipo: true
+            }
+          },
+          dominio_meta: {
+            select: {
+              id: true,
+              nombre: true,
+              tipo: true
+            }
+          },
+          _count: {
+            select: {
+              expresiones_metaforicas: true
+            }
+          }
+        }
+      })
+    ]);
+
+    res.json({
+      data: {
+        corpus_slug: corpus.slug,
+        total,
+        limit,
+        offset,
+        items: metaphors.map((metaphor: any) => ({
+          id: metaphor.id,
+          nombre: metaphor.nombre,
+          descripcion: metaphor.descripcion,
+          tipologia: metaphor.tipologia,
+          dominio_fuente: metaphor.dominio_fuente,
+          dominio_meta: metaphor.dominio_meta,
+          total_expresiones: metaphor._count.expresiones_metaforicas
+        }))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/v1/corpora/:slug/metaphors/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const metaphor = await prisma.conceptualMetaphor.findFirst({
+      where: {
+        id: req.params.id,
+        corpus_id: corpus.id
+      },
+      select: {
+        id: true,
+        nombre: true,
+        descripcion: true,
+        tipologia: true,
+        dominio_fuente_id: true,
+        dominio_meta_id: true,
+        dominio_fuente: {
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true,
+            dominio_padre_id: true
+          }
+        },
+        dominio_meta: {
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true,
+            dominio_padre_id: true
+          }
+        }
+      }
+    });
+
+    if (!metaphor) {
+      res.status(404).json({ error: `No existe metáfora '${req.params.id}' en el corpus '${corpus.slug}'.` });
+      return;
+    }
+
+    const [totalExpresiones, expresionesAsociadas, ontologicas, epistemicas] = await Promise.all([
+      prisma.metaphoricalExpression.count({
+        where: {
+          corpus_id: corpus.id,
+          metafora_conceptual_id: metaphor.id
+        }
+      }),
+      prisma.metaphoricalExpression.findMany({
+        where: {
+          corpus_id: corpus.id,
+          metafora_conceptual_id: metaphor.id
+        },
+        take: 20,
+        orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          id_registro: true,
+          orden: true,
+          expresion_metaforica: true,
+          corresp_ontologicas: true,
+          corresp_epistemicas: true,
+          fuente_textual: {
+            select: {
+              id: true,
+              titulo_1: true,
+              autor: true
+            }
+          }
+        }
+      }),
+      prisma.metaphoricalExpression.groupBy({
+        by: ['corresp_ontologicas'],
+        where: {
+          corpus_id: corpus.id,
+          metafora_conceptual_id: metaphor.id,
+          corresp_ontologicas: {
+            not: null
+          }
+        },
+        _count: {
+          _all: true
+        }
+      }),
+      prisma.metaphoricalExpression.groupBy({
+        by: ['corresp_epistemicas'],
+        where: {
+          corpus_id: corpus.id,
+          metafora_conceptual_id: metaphor.id,
+          corresp_epistemicas: {
+            not: null
+          }
+        },
+        _count: {
+          _all: true
+        }
+      })
+    ]);
+
+    res.json({
+      data: {
+        id: metaphor.id,
+        nombre: metaphor.nombre,
+        descripcion: metaphor.descripcion,
+        tipologia: metaphor.tipologia,
+        dominio_fuente: metaphor.dominio_fuente,
+        dominio_meta: metaphor.dominio_meta,
+        estadisticas: {
+          total_expresiones: totalExpresiones,
+          correspondencias_ontologicas_distintas: ontologicas.length,
+          correspondencias_epistemicas_distintas: epistemicas.length
+        },
+        correspondencias: {
+          ontologicas: ontologicas
+            .filter((item: any) => item.corresp_ontologicas && String(item.corresp_ontologicas).trim())
+            .map((item: any) => ({
+              valor: item.corresp_ontologicas,
+              frecuencia: item._count._all
+            })),
+          epistemicas: epistemicas
+            .filter((item: any) => item.corresp_epistemicas && String(item.corresp_epistemicas).trim())
+            .map((item: any) => ({
+              valor: item.corresp_epistemicas,
+              frecuencia: item._count._all
+            }))
+        },
+        expresiones_asociadas: expresionesAsociadas
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/v1/corpora/:slug/metaphors/:id/expressions', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const metaphor = await prisma.conceptualMetaphor.findFirst({
+      where: {
+        id: req.params.id,
+        corpus_id: corpus.id
+      },
+      select: {
+        id: true,
+        nombre: true
+      }
+    });
+
+    if (!metaphor) {
+      res.status(404).json({ error: `No existe metáfora '${req.params.id}' en el corpus '${corpus.slug}'.` });
+      return;
+    }
+
+    const limit = parseNumberParam(req.query.limit, 20, 1, 100);
+    const offset = parseNumberParam(req.query.offset, 0, 0);
+
+    const [total, items] = await Promise.all([
+      prisma.metaphoricalExpression.count({
+        where: {
+          corpus_id: corpus.id,
+          metafora_conceptual_id: metaphor.id
+        }
+      }),
+      prisma.metaphoricalExpression.findMany({
+        where: {
+          corpus_id: corpus.id,
+          metafora_conceptual_id: metaphor.id
+        },
+        skip: offset,
+        take: limit,
+        orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          id_registro: true,
+          orden: true,
+          pagina: true,
+          expresion_metaforica: true,
+          contexto: true,
+          foco: true,
+          tipologia: true,
+          fuente_textual: {
+            select: {
+              id: true,
+              titulo_1: true,
+              autor: true,
+              anio: true
+            }
+          }
+        }
+      })
+    ]);
+
+    res.json({
+      data: {
+        corpus_slug: corpus.slug,
+        metaphor: {
+          id: metaphor.id,
+          nombre: metaphor.nombre
+        },
+        total,
+        limit,
+        offset,
+        items
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/v1/corpora/:slug/metaphors/:id/related', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const metaphor = await prisma.conceptualMetaphor.findFirst({
+      where: {
+        id: req.params.id,
+        corpus_id: corpus.id
+      },
+      select: {
+        id: true,
+        nombre: true,
+        dominio_fuente_id: true,
+        dominio_meta_id: true,
+        dominio_fuente: {
+          select: {
+            id: true,
+            dominio_padre_id: true
+          }
+        },
+        dominio_meta: {
+          select: {
+            id: true,
+            dominio_padre_id: true
+          }
+        }
+      }
+    });
+
+    if (!metaphor) {
+      res.status(404).json({ error: `No existe metáfora '${req.params.id}' en el corpus '${corpus.slug}'.` });
+      return;
+    }
+
+    const baseDomainIds = [metaphor.dominio_fuente_id, metaphor.dominio_meta_id].filter(Boolean) as string[];
+    const parentDomainIds = [metaphor.dominio_fuente?.dominio_padre_id, metaphor.dominio_meta?.dominio_padre_id].filter(
+      Boolean
+    ) as string[];
+
+    const adjacentDomains = await prisma.domain.findMany({
+      where: {
+        corpus_id: corpus.id,
+        OR: [
+          { id: { in: [...baseDomainIds, ...parentDomainIds] } },
+          { dominio_padre_id: { in: [...baseDomainIds, ...parentDomainIds] } }
+        ]
+      },
+      select: {
+        id: true
+      }
+    });
+
+    const relatedDomainIds = Array.from(new Set(adjacentDomains.map((domain: any) => domain.id)));
+
+    if (relatedDomainIds.length === 0) {
+      res.json({
+        data: {
+          corpus_slug: corpus.slug,
+          source_metaphor: {
+            id: metaphor.id,
+            nombre: metaphor.nombre
+          },
+          total: 0,
+          items: []
+        }
+      });
+      return;
+    }
+
+    const relatedMetaphors = await prisma.conceptualMetaphor.findMany({
+      where: {
+        corpus_id: corpus.id,
+        id: {
+          not: metaphor.id
+        },
+        OR: [
+          { dominio_fuente_id: { in: relatedDomainIds } },
+          { dominio_meta_id: { in: relatedDomainIds } }
+        ]
+      },
+      take: 50,
+      orderBy: [{ nombre: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        nombre: true,
+        tipologia: true,
+        dominio_fuente: {
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true
+          }
+        },
+        dominio_meta: {
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true
+          }
+        },
+        _count: {
+          select: {
+            expresiones_metaforicas: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      data: {
+        corpus_slug: corpus.slug,
+        source_metaphor: {
+          id: metaphor.id,
+          nombre: metaphor.nombre
+        },
+        total: relatedMetaphors.length,
+        items: relatedMetaphors.map((item: any) => ({
+          id: item.id,
+          nombre: item.nombre,
+          tipologia: item.tipologia,
+          dominio_fuente: item.dominio_fuente,
+          dominio_meta: item.dominio_meta,
+          total_expresiones: item._count.expresiones_metaforicas
+        }))
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get('/api/v1/corpora', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const corpora = await prisma.corpus.findMany({
