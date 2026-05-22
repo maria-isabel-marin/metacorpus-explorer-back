@@ -62,29 +62,29 @@ type ImportReport = {
 };
 
 const HEADER_ALIASES = {
-  id: ['id', 'id_registro', 'registro_id'],
-  orden: ['orden', 'n', 'numero', 'secuencia', 'orden_registro'],
+  id: ['id', 'id_registro', 'registro_id', 'custom_id'],
+  orden: ['orden', 'n', 'numero', 'secuencia', 'orden_registro', 'order'],
   pagina: ['pagina', 'page'],
-  titulo1: ['titulo_1', 'titulo1', 'titulo_principal'],
-  titulo2: ['titulo_2', 'titulo2'],
-  titulo3: ['titulo_3', 'titulo3'],
+  titulo1: ['titulo_1', 'titulo1', 'titulo_principal', 'document'],
+  titulo2: ['titulo_2', 'titulo2', 'heading_2'],
+  titulo3: ['titulo_3', 'titulo3', 'heading_3'],
   autor: ['autor'],
   anio: ['anio', 'ano', 'year'],
   referenciaBib: ['referencia_bib', 'referencia_bibliografica', 'referencia'],
-  expresionMetaforica: ['expresion_metaforica', 'expresion'],
-  contexto: ['contexto'],
-  foco: ['foco'],
-  focoLematizado: ['foco_lematizado', 'foco_lematizado_1', 'foco_lemma'],
-  categoriaGramatical: ['cat_gramatical_foco', 'cat_gramatical', 'categoria_gramatical', 'pos_foco'],
-  significadoContextual: ['significado_contextual'],
-  significadoBasico: ['significado_basico'],
-  metaforaConceptual: ['metafora_conceptual'],
-  dominioFuente: ['dominio_fuente'],
-  dominioMeta: ['dominio_meta'],
-  correspOntologicas: ['corresp_ontologicas', 'correspondencias_ontologicas'],
-  correspEpistemicas: ['corresp_epistemicas', 'correspondencias_epistemicas'],
-  tipologia: ['tipologia', 'tipo_metafora'],
-  observaciones: ['observaciones', 'notas']
+  expresionMetaforica: ['expresion_metaforica', 'expresion', 'metaphorical_expression'],
+  contexto: ['contexto', 'context'],
+  foco: ['foco', 'focus'],
+  focoLematizado: ['foco_lematizado', 'foco_lematizado_1', 'foco_lemma', 'focus_lemma'],
+  categoriaGramatical: ['cat_gramatical_foco', 'cat_gramatical', 'categoria_gramatical', 'pos_foco', 'focus_pos'],
+  significadoContextual: ['significado_contextual', 'contextual_meaning'],
+  significadoBasico: ['significado_basico', 'basic_meaning'],
+  metaforaConceptual: ['metafora_conceptual', 'conceptual_metaphor'],
+  dominioFuente: ['dominio_fuente', 'source_domain'],
+  dominioMeta: ['dominio_meta', 'target_domain'],
+  correspOntologicas: ['corresp_ontologicas', 'correspondencias_ontologicas', 'ontological_correspondences'],
+  correspEpistemicas: ['corresp_epistemicas', 'correspondencias_epistemicas', 'epistemic_correspondences'],
+  tipologia: ['tipologia', 'tipo_metafora', 'novelty_type'],
+  observaciones: ['observaciones', 'notas', 'comments']
 } as const;
 
 function parseArgs(argv: string[]): CliArgs {
