@@ -193,9 +193,50 @@ Devuelve:
 
 Si el corpus no existe o no está activo, responde `404`.
 
-## 10) API de metáforas conceptuales (scoped a corpus)
+## 10) API REST de expresiones metafóricas (scoped a corpus)
 
-### 10.1 Listado de metáforas
+Todos los endpoints están aislados por corpus usando `slug` y `corpus_id`.
+
+### 10.1 Endpoints
+
+- `GET /api/v1/corpora/{slug}/expressions`
+  - listado paginado (`limit`, `offset`)
+  - filtros combinables: `metafora`, `dominio_fuente`, `dominio_meta`, `tipologia`, `cat_gramatical`, `fuente`
+  - ordenamiento: `sort=orden|id` y `order=asc|desc`
+
+- `GET /api/v1/corpora/{slug}/expressions/{id}`
+  - detalle completo de expresión (incluye `orden`)
+
+- `GET /api/v1/corpora/{slug}/expressions/{id}/nearby?range=5`
+  - expresiones adyacentes por `orden` en la misma `fuente_textual`
+
+- `GET /api/v1/corpora/{slug}/expressions/search?q={query}`
+  - búsqueda full-text (`expresion_metaforica`, `contexto`, `foco`)
+
+- `GET /api/v1/corpora/{slug}/expressions/concordance?q={query}`
+  - concordancia KWIC
+
+### 10.2 JSON-LD y OpenAPI
+
+- Las respuestas de expresiones se devuelven en formato JSON-LD (`@context`, `@type`).
+- Especificación OpenAPI generada con `swagger-jsdoc`:
+
+```http
+GET /api/v1/openapi.json
+```
+
+Guía de pruebas de aceptación:
+
+- `docs/validacion-aceptacion-api-expresiones.md`
+
+Smoke test automatizado (con la API corriendo):
+
+```bash
+npm run smoke:expressions-api
+```
+## 11) API de metáforas conceptuales (scoped a corpus)
+
+### 11.1 Listado de metáforas
 
 ```http
 GET /api/v1/corpora/{slug}/metaphors
@@ -209,7 +250,7 @@ Filtros soportados:
 
 Incluye resumen por metáfora y total de expresiones asociadas.
 
-### 10.2 Detalle de metáfora
+### 11.2 Detalle de metáfora
 
 ```http
 GET /api/v1/corpora/{slug}/metaphors/{id}
@@ -222,7 +263,7 @@ Incluye:
 - correspondencias ontológicas y epistémicas (con frecuencia)
 - muestra de expresiones asociadas
 
-### 10.3 Expresiones por metáfora
+### 11.3 Expresiones por metáfora
 
 ```http
 GET /api/v1/corpora/{slug}/metaphors/{id}/expressions
@@ -230,7 +271,7 @@ GET /api/v1/corpora/{slug}/metaphors/{id}/expressions
 
 Incluye paginación por `limit` y `offset`.
 
-### 10.4 Metáforas relacionadas
+### 11.4 Metáforas relacionadas
 
 ```http
 GET /api/v1/corpora/{slug}/metaphors/{id}/related
