@@ -150,3 +150,45 @@ Qué hace el CLI:
 - Si no existe columna `orden`, lo infiere desde el sufijo numérico de `id`/`id_registro` (ej: `CEV_123` -> `orden=123`).
 - Respeta idempotencia por `id_registro` + `corpus_id` (reimportación actualiza en lugar de duplicar).
 - Reporta métricas de importación en consola.
+
+## 9) API REST de corpus
+
+Levantar API:
+
+```bash
+npm run api
+```
+
+Por defecto expone en `http://localhost:3000` (puedes cambiar con `PORT`).
+
+### 9.1 Listado de corpus activos
+
+```http
+GET /api/v1/corpora
+```
+
+Devuelve solo corpus con `activo=true` y resumen con:
+
+- `nombre`
+- `slug`
+- `descripcion`
+- `idioma`
+- `numero_registros` (conteo de expresiones metafóricas del corpus)
+- `version`
+- `licencia`
+
+### 9.2 Detalle de un corpus por slug
+
+```http
+GET /api/v1/corpora/{slug}
+```
+
+Devuelve:
+
+- metadatos base del corpus
+- `fair` (findable, accessible, interoperable, reusable)
+- `estadisticas_agregadas` (registros, dominios, fuentes, metáforas, relaciones, categorías)
+- `como_citar`
+- `doi`
+
+Si el corpus no existe o no está activo, responde `404`.
