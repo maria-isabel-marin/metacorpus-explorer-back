@@ -192,3 +192,48 @@ Devuelve:
 - `doi`
 
 Si el corpus no existe o no está activo, responde `404`.
+
+## 10) API de metáforas conceptuales (scoped a corpus)
+
+### 10.1 Listado de metáforas
+
+```http
+GET /api/v1/corpora/{slug}/metaphors
+```
+
+Filtros soportados:
+
+- `dominio_fuente`
+- `dominio_meta`
+- `tipologia`
+
+Incluye resumen por metáfora y total de expresiones asociadas.
+
+### 10.2 Detalle de metáfora
+
+```http
+GET /api/v1/corpora/{slug}/metaphors/{id}
+```
+
+Incluye:
+
+- dominios fuente/meta
+- estadísticas
+- correspondencias ontológicas y epistémicas (con frecuencia)
+- muestra de expresiones asociadas
+
+### 10.3 Expresiones por metáfora
+
+```http
+GET /api/v1/corpora/{slug}/metaphors/{id}/expressions
+```
+
+Incluye paginación por `limit` y `offset`.
+
+### 10.4 Metáforas relacionadas
+
+```http
+GET /api/v1/corpora/{slug}/metaphors/{id}/related
+```
+
+Retorna metáforas relacionadas por dominios compartidos o dominios adyacentes (padre/hijo).
