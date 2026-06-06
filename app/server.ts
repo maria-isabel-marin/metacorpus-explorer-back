@@ -24,7 +24,10 @@ const port = Number(process.env.PORT ?? 3000);
 
 app.use(express.json());
 app.use(cors({
-  origin: 'https://corpus.metaphormodel.org',
+  origin: [
+    'http://metacorpus-explorer-front.railway.internal:8080',
+    'http://localhost:3000'
+  ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
