@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express, { NextFunction, Request, Response } from 'express';
+import cors from 'cors';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
@@ -22,6 +23,11 @@ const app = express();
 const port = Number(process.env.PORT ?? 3000);
 
 app.use(express.json());
+app.use(cors({
+  origin: 'https://corpus.metaphormodel.org',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 type SortField = 'orden' | 'id';
 type SortDirection = 'asc' | 'desc';
