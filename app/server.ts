@@ -1372,8 +1372,8 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: message });
 });
 
-app.listen(port, () => {
-  console.log(`API de MetaCorpus escuchando en http://localhost:${port}`);
+app.listen(port, '::', () => {
+  console.log(`API de MetaCorpus escuchando en http://[::]:${port}`);
 });
 
 async function shutdown(signal: string): Promise<void> {
