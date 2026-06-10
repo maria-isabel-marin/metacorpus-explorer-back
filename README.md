@@ -128,11 +128,41 @@ Dependencias requeridas (ya declaradas en `package.json`):
 - `typescript`
 - `xlsx`
 
-Ejemplos de uso:
+### Parámetros disponibles
 
+- `--file`: Ruta al archivo Excel (requerido)
+- `--corpus`: Slug único del corpus (requerido)
+- `--name`: Nombre del corpus (opcional)
+- `--description`: Descripción del corpus (opcional)
+- `--language`: Idioma del corpus (opcional, default: 'es')
+- `--version`: Versión del corpus (opcional, default: '1.0.0')
+- `--license`: Licencia del corpus (opcional)
+- `--authors`: Autores del corpus (opcional)
+- `--doi`: DOI del corpus (opcional)
+- `--publication-date`: Año de publicación (opcional)
+- `--active`: Si el corpus está activo (opcional, default: true)
+
+### Ejemplos de uso
+
+**Básico:**
 ```bash
 npx ts-node scripts/ingest.ts --file corpus.xlsx --corpus cev-amazonia --name "CEV Amazonia" --license "CC-BY-4.0"
-npx ts-node scripts/ingest.ts --file corpus2.xlsx --corpus cev-pacifico --name "CEV Pacífico"
+```
+
+**Completo con todos los metadatos:**
+```bash
+npx ts-node scripts/ingest.ts \
+  --file "corpus.xlsx" \
+  --corpus "tdg-betancur-villegas-2025" \
+  --name "Tomo Mi cuerpo es la verdad" \
+  --description "Corpus resultante del trabajo de pregrado..." \
+  --language "ES" \
+  --version "1.0.0" \
+  --license "CC BY 4.0" \
+  --authors "Betancur Serna, Maribel; Villegas Serna, Luisa Fernanda" \
+  --doi "10.1234/example.doi" \
+  --publication-date "2025" \
+  --active true
 ```
 
 También disponible como script npm:
@@ -141,7 +171,7 @@ También disponible como script npm:
 npm run ingest -- --file corpus.xlsx --corpus cev-amazonia --name "CEV Amazonia"
 ```
 
-Qué hace el CLI:
+### Qué hace el CLI
 
 - Lee `.xlsx` (primera hoja).
 - Normaliza encabezados y campos textuales.
@@ -150,6 +180,17 @@ Qué hace el CLI:
 - Si no existe columna `orden`, lo infiere desde el sufijo numérico de `id`/`id_registro` (ej: `CEV_123` -> `orden=123`).
 - Respeta idempotencia por `id_registro` + `corpus_id` (reimportación actualiza en lugar de duplicar).
 - Reporta métricas de importación en consola.
+
+### Notas importantes
+
+- **Comillas en descripciones**: Si necesitas incluir comillas dobles dentro de una descripción, usa comillas simples para envolver todo el texto o escapa las comillas dobles. Ejemplo:
+  ```bash
+  --description "Corpus resultante del trabajo de pregrado 'Conceptualización de las mujeres...'"
+  # o
+  --description "Corpus resultante del trabajo de pregrado \"Conceptualización de las mujeres...\""
+  ```
+- **Idempotencia**: Si ejecutas el mismo comando varias veces, los datos se actualizarán en lugar de duplicarse.
+- **Fechas**: El parámetro `--publication-date` espera solo el año (ej: "2025") y se convertirá automáticamente a una fecha válida.
 
 ## 9) API REST de corpus
 
