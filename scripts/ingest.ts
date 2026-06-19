@@ -21,6 +21,12 @@ type CliArgs = {
   name?: string;
   description?: string;
   license?: string;
+  language?: string;
+  version?: string;
+  authors?: string;
+  doi?: string;
+  publicationDate?: string;
+  active?: boolean;
 };
 
 type InputRecord = {
@@ -112,6 +118,18 @@ function parseArgs(argv: string[]): CliArgs {
       args.description = next;
     } else if (key === 'license') {
       args.license = next;
+    } else if (key === 'language') {
+      args.language = next;
+    } else if (key === 'version') {
+      args.version = next;
+    } else if (key === 'authors') {
+      args.authors = next;
+    } else if (key === 'doi') {
+      args.doi = next;
+    } else if (key === 'publication-date') {
+      args.publicationDate = next;
+    } else if (key === 'active') {
+      args.active = next === 'true' || next === '1';
     }
 
     i += 1;
@@ -421,10 +439,13 @@ async function main(): Promise<void> {
         slug: args.corpus,
         nombre: args.name ?? args.corpus,
         descripcion: args.description ?? null,
-        idioma: 'es',
-        version: '1.0.0',
+        idioma: args.language ?? 'es',
+        version: args.version ?? '1.0.0',
         licencia: args.license ?? null,
-        activo: true,
+        doi: args.doi ?? null,
+        autores: args.authors ?? null,
+        fecha_publicacion: args.publicationDate ? new Date(parseInt(args.publicationDate), 0, 1) : null,
+        activo: args.active ?? true,
         metadatos_extra: {
           fuente_ingesta: 'scripts/ingest.ts',
           archivo_origen: path.basename(args.file),
@@ -434,7 +455,13 @@ async function main(): Promise<void> {
       update: {
         nombre: args.name ?? undefined,
         descripcion: args.description ?? undefined,
+        idioma: args.language ?? undefined,
+        version: args.version ?? undefined,
         licencia: args.license ?? undefined,
+        doi: args.doi ?? undefined,
+        autores: args.authors ?? undefined,
+        fecha_publicacion: args.publicationDate ? new Date(parseInt(args.publicationDate), 0, 1) : undefined,
+        activo: args.active ?? undefined,
         metadatos_extra: {
           fuente_ingesta: 'scripts/ingest.ts',
           archivo_origen: path.basename(args.file),

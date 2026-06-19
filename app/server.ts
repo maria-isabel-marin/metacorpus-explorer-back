@@ -1223,6 +1223,121 @@ app.get('/api/v1/corpora/:slug/metaphors/:id/related', async (req: Request, res:
   }
 });
 
+// ========== ENDPOINTS DE DOMINIOS ==========
+
+app.get('/api/v1/corpora/:slug/domains', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const tipo = parseStringParam(req.query.tipo);
+    const tipoFilter = tipo === 'fuente' || tipo === 'meta' ? tipo.toUpperCase() : undefined;
+
+    const where: Record<string, unknown> = { corpus_id: corpus.id };
+    if (tipoFilter) {
+      where.tipo = tipoFilter;
+    }
+
+    const domains = await prisma.domain.findMany({
+      where,
+      orderBy: [{ nombre: 'asc' }],
+      select: {
+        id: true,
+        nombre: true,
+        tipo: true,
+        descripcion: true,
+        dominio_padre_id: true,
+        _count: {
+          select: {
+            metaforas_fuente: true,
+            metaforas_meta: true
+          }
+        }
+      }
+    });
+
+    // Calculate nivel_jerarquico by traversing parent chain
+    const idToParent = new Map<string, string | null>(
+      domains.map((d: any) => [d.id, d.dominio_padre_id])
+    );
+
+    function getNivel(id: string, visited = new Set<string>()): number {
+      if (visited.has(id)) return 0;
+      visited.add(id);
+      const parentId = idToParent.get(id);
+      if (!parentId) return 0;
+      return 1 + getNivel(parentId, visited);
+    }
+
+    const items = domains.map((d: any) => ({
+      id: d.id,
+      nombre: d.nombre,
+      tipo: d.tipo.toLowerCase() as 'fuente' | 'meta',
+      macrodominio: null,
+      frecuencia: d._count.metaforas_fuente + d._count.metaforas_meta,
+      descripcion: d.descripcion,
+      dominio_padre_id: d.dominio_padre_id,
+      nivel_jerarquico: getNivel(d.id)
+    }));
+
+    res.json({
+      data: {
+        corpus_slug: corpus.slug,
+        total: items.length,
+        items
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/v1/corpora/:slug/domain-relations', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const relations = await prisma.semanticRelation.findMany({
+      where: { corpus_id: corpus.id },
+      orderBy: [{ tipo_relacion: 'asc' }],
+      select: {
+        id: true,
+        tipo_relacion: true,
+        dominio_origen: {
+          select: { id: true, nombre: true }
+        },
+        dominio_destino: {
+          select: { id: true, nombre: true }
+        }
+      }
+    });
+
+    const items = relations.map((r: any) => ({
+      dominio_id: r.dominio_origen.id,
+      dominio_nombre: r.dominio_origen.nombre,
+      relacionado_con_id: r.dominio_destino.id,
+      relacionado_con_nombre: r.dominio_destino.nombre,
+      tipo_relacion: r.tipo_relacion.toLowerCase() as string
+    }));
+
+    res.json({
+      data: {
+        corpus_slug: corpus.slug,
+        total: items.length,
+        items
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ========== ENDPOINTS ADICIONALES DE CORPORA ==========
 
 app.get('/api/v1/corpora', async (_req: Request, res: Response, next: NextFunction) => {
@@ -1237,6 +1352,7 @@ app.get('/api/v1/corpora', async (_req: Request, res: Response, next: NextFuncti
         idioma: true,
         version: true,
         licencia: true,
+        fecha_publicacion: true,
         _count: {
           select: {
             expresiones_metaforicas: true
@@ -1253,6 +1369,7 @@ app.get('/api/v1/corpora', async (_req: Request, res: Response, next: NextFuncti
         idioma: corpus.idioma,
         version: corpus.version,
         licencia: corpus.licencia,
+        fecha_publicacion: toIsoDate(corpus.fecha_publicacion),
         numero_registros: corpus._count.expresiones_metaforicas
       }))
     });
