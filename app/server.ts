@@ -1482,6 +1482,225 @@ app.get('/api/v1/corpora/:slug', async (req: Request, res: Response, next: NextF
   }
 });
 
+// ========== ENDPOINTS DE ESTADÍSTICAS AVANZADAS ==========
+
+// Densidad metafórica por orden (para gráfico de densidad)
+app.get('/api/v1/corpora/:slug/stats/density', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const bucketSize = parseNumberParam(req.query.bucket, 100, 10, 1000);
+
+    // Obtener expresiones con orden y tipología
+    const expressions = await prisma.metaphoricalExpression.findMany({
+      where: { corpus_id: corpus.id },
+      select: {
+        orden: true,
+        tipologia: true
+      },
+      orderBy: { orden: 'asc' }
+    });
+
+    // Calcular rango máximo
+    const maxOrden = expressions.length > 0 
+      ? Math.max(...expressions.map((e: any) => e.orden ?? 0)) 
+      : 0;
+
+    // Crear buckets
+    const buckets: { range: string; start: number; end: number; count: number; byTypology: Record<string, number> }[] = [];
+    const numBuckets = Math.ceil(maxOrden / bucketSize) || 1;
+
+    for (let i = 0; i < numBuckets; i++) {
+      const start = i * bucketSize;
+      const end = Math.min((i + 1) * bucketSize - 1, maxOrden);
+      buckets.push({
+        range: `${start}-${end}`,
+        start,
+        end,
+        count: 0,
+        byTypology: {}
+      });
+    }
+
+    // Distribuir expresiones en buckets
+    expressions.forEach((expr: any) => {
+      const orden = expr.orden ?? 0;
+      const bucketIndex = Math.floor(orden / bucketSize);
+      if (bucketIndex < buckets.length) {
+        buckets[bucketIndex].count++;
+        const tipo = expr.tipologia || 'OTRA';
+        buckets[bucketIndex].byTypology[tipo] = (buckets[bucketIndex].byTypology[tipo] || 0) + 1;
+      }
+    });
+
+    res.json({
+      corpus_slug: corpus.slug,
+      bucket_size: bucketSize,
+      total_expressions: expressions.length,
+      max_orden: maxOrden,
+      buckets
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Proximidad textual - Scatter plot (expresiones cercanas)
+app.get('/api/v1/corpora/:slug/stats/proximity', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const range = parseNumberParam(req.query.range, 50, 10, 200);
+    const limit = parseNumberParam(req.query.limit, 1000, 100, 5000);
+
+    // Obtener expresiones con metáfora conceptual para análisis de proximidad
+    const expressions = await prisma.metaphoricalExpression.findMany({
+      where: { corpus_id: corpus.id },
+      select: {
+        id: true,
+        orden: true,
+        expresion_metaforica: true,
+        foco: true,
+        tipologia: true,
+        metafora_conceptual: {
+          select: {
+            id: true,
+            nombre: true,
+            dominio_fuente: { select: { nombre: true } },
+            dominio_meta: { select: { nombre: true } }
+          }
+        }
+      },
+      orderBy: { orden: 'asc' },
+      take: limit
+    });
+
+    // Calcular proximidad - agrupar expresiones cercanas
+    const proximityData: {
+      x: number;
+      y: number;
+      metaphorId: string;
+      metaphorName: string;
+      expression: string;
+      focus: string | null;
+      typology: string | null;
+      domainSource: string | null;
+      domainTarget: string | null;
+    }[] = [];
+
+    for (let i = 0; i < expressions.length; i++) {
+      const expr = expressions[i];
+      const orden = expr.orden ?? 0;
+      
+      // Contar expresiones cercanas (en ventana de ±range)
+      const nearbyCount = expressions.filter((e: any) => {
+        const eOrden = e.orden ?? 0;
+        return Math.abs(eOrden - orden) <= range && e.id !== expr.id;
+      }).length;
+
+      proximityData.push({
+        x: orden,
+        y: nearbyCount,
+        metaphorId: expr.metafora_conceptual?.id || '',
+        metaphorName: expr.metafora_conceptual?.nombre || 'Sin metáfora',
+        expression: expr.expresion_metaforica,
+        focus: expr.foco,
+        typology: expr.tipologia,
+        domainSource: expr.metafora_conceptual?.dominio_fuente?.nombre || null,
+        domainTarget: expr.metafora_conceptual?.dominio_meta?.nombre || null
+      });
+    }
+
+    res.json({
+      corpus_slug: corpus.slug,
+      range,
+      total_points: proximityData.length,
+      data: proximityData
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Matriz de co-ocurrencia dominio fuente × dominio meta (Heatmap)
+app.get('/api/v1/corpora/:slug/stats/domain-matrix', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const minCount = parseNumberParam(req.query.minCount, 1, 1, 100);
+    const limit = parseNumberParam(req.query.limit, 50, 10, 100);
+
+    // Obtener metáforas con dominios
+    const metaphors = await prisma.conceptualMetaphor.findMany({
+      where: { corpus_id: corpus.id },
+      select: {
+        id: true,
+        dominio_fuente: { select: { id: true, nombre: true } },
+        dominio_meta: { select: { id: true, nombre: true } },
+        _count: { select: { expresiones_metaforicas: true } }
+      }
+    });
+
+    // Contar frecuencias
+    const matrix: Record<string, Record<string, { count: number; metaphorIds: string[] }>> = {};
+    const sourceDomains = new Set<string>();
+    const targetDomains = new Set<string>();
+
+    metaphors.forEach((m: any) => {
+      const sourceName = m.dominio_fuente?.nombre;
+      const targetName = m.dominio_meta?.nombre;
+      if (!sourceName || !targetName) return;
+
+      sourceDomains.add(sourceName);
+      targetDomains.add(targetName);
+
+      if (!matrix[sourceName]) matrix[sourceName] = {};
+      if (!matrix[sourceName][targetName]) {
+        matrix[sourceName][targetName] = { count: 0, metaphorIds: [] };
+      }
+      matrix[sourceName][targetName].count += m._count.expresiones_metaforicas;
+      matrix[sourceName][targetName].metaphorIds.push(m.id);
+    });
+
+    // Filtrar por mínimo count y limitar
+    const sources = Array.from(sourceDomains).slice(0, limit);
+    const targets = Array.from(targetDomains).slice(0, limit);
+
+    const filteredMatrix: Record<string, Record<string, { count: number; metaphorIds: string[] }>> = {};
+    sources.forEach(s => {
+      filteredMatrix[s] = {};
+      targets.forEach(t => {
+        const cell = matrix[s]?.[t];
+        if (cell && cell.count >= minCount) {
+          filteredMatrix[s][t] = cell;
+        }
+      });
+    });
+
+    res.json({
+      corpus_slug: corpus.slug,
+      source_domains: sources,
+      target_domains: targets,
+      min_count: minCount,
+      matrix: filteredMatrix
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ========== MIDDLEWARE DE ERRORES Y ARRANQUE ==========
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
