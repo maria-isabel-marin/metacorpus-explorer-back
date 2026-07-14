@@ -350,19 +350,39 @@ function toIsoDate(value: Date | null): string | null {
 }
 
 function getAuthorNames(autores: unknown): string[] {
-  if (!Array.isArray(autores)) {
+  // Normalize possible raw JSON string stored in the DB
+  let normalized: unknown = autores;
+  if (typeof autores === 'string') {
+    try {
+      normalized = JSON.parse(autores);
+    } catch {
+      // If it's a plain string, treat it as a single author
+      return [autores.trim()];
+    }
+  }
+
+  if (!Array.isArray(normalized)) {
     return [];
   }
 
   const names: string[] = [];
-  for (const autor of autores) {
-    if (!autor || typeof autor !== 'object') {
+  for (const autor of normalized) {
+    if (autor == null) {
       continue;
     }
 
-    const maybeNombre = (autor as { nombre?: unknown }).nombre;
-    if (typeof maybeNombre === 'string' && maybeNombre.trim()) {
-      names.push(maybeNombre.trim());
+    if (typeof autor === 'string') {
+      if (autor.trim()) {
+        names.push(autor.trim());
+      }
+      continue;
+    }
+
+    if (typeof autor === 'object') {
+      const maybeNombre = (autor as { nombre?: unknown }).nombre;
+      if (typeof maybeNombre === 'string' && maybeNombre.trim()) {
+        names.push(maybeNombre.trim());
+      }
     }
   }
 
