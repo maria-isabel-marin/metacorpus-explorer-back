@@ -788,13 +788,34 @@ app.get('/api/v1/corpora/:slug/metaphors', async (req: Request, res: Response, n
     const dominioFuente = parseStringParam(req.query.dominio_fuente);
     const dominioMeta = parseStringParam(req.query.dominio_meta);
     const tipologia = parseStringParam(req.query.tipologia);
+    const catGramatical = parseStringParam(req.query.cat_gramatical);
 
     const where: Record<string, unknown> = {
       corpus_id: corpus.id
     };
 
     if (tipologia) {
-      where.tipologia = { contains: tipologia, mode: 'insensitive' };
+      if (tipologia.toUpperCase() === 'OTRA') {
+        where.expresiones_metaforicas = { none: { tipologia: { not: null } } };
+      } else {
+        where.expresiones_metaforicas = {
+          some: { tipologia: { contains: tipologia, mode: 'insensitive' } }
+        };
+      }
+    }
+
+    if (catGramatical) {
+      const existingFilter = (where.expresiones_metaforicas as Record<string, unknown> | undefined) ?? {};
+      const someFilter = (existingFilter.some as Record<string, unknown> | undefined) ?? {};
+      where.expresiones_metaforicas = {
+        ...existingFilter,
+        some: {
+          ...someFilter,
+          categoria_gramatical: {
+            is: { nombre: { contains: catGramatical, mode: 'insensitive' } }
+          }
+        }
+      };
     }
 
     if (dominioFuente) {
@@ -1695,6 +1716,82 @@ app.get('/api/v1/corpora/:slug/stats/domain-matrix', async (req: Request, res: R
       target_domains: targets,
       min_count: minCount,
       matrix: filteredMatrix
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ========== TIPOLOGÍAS Y CATEGORÍAS GRAMATICALES ==========
+
+app.get('/api/v1/corpora/:slug/stats/typologies', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const [groups, sinTipologia] = await Promise.all([
+      prisma.metaphoricalExpression.groupBy({
+        by: ['tipologia'],
+        where: { corpus_id: corpus.id, tipologia: { not: null } },
+        _count: { tipologia: true },
+        orderBy: { _count: { tipologia: 'desc' } }
+      }),
+      prisma.conceptualMetaphor.count({
+        where: {
+          corpus_id: corpus.id,
+          expresiones_metaforicas: {
+            none: { tipologia: { not: null } }
+          }
+        }
+      })
+    ]);
+
+    const data = groups.map((g: any) => ({
+      tipologia: g.tipologia,
+      count: g._count.tipologia
+    }));
+
+    if (sinTipologia > 0) {
+      data.push({ tipologia: 'OTRA', count: sinTipologia });
+    }
+
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/v1/corpora/:slug/grammatical-categories', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const corpus = await findActiveCorpusBySlug(req.params.slug);
+    if (!corpus) {
+      res.status(404).json({ error: `No se encontró corpus activo para slug '${req.params.slug}'.` });
+      return;
+    }
+
+    const categories = await prisma.grammaticalCategory.findMany({
+      where: {
+        expresiones_metaforicas: { some: { corpus_id: corpus.id } }
+      },
+      select: {
+        id: true,
+        nombre: true,
+        abreviatura: true,
+        _count: { select: { expresiones_metaforicas: true } }
+      },
+      orderBy: { nombre: 'asc' }
+    });
+
+    res.json({
+      data: categories.map((c: any) => ({
+        id: c.id,
+        nombre: c.nombre,
+        abreviatura: c.abreviatura,
+        count: c._count.expresiones_metaforicas
+      }))
     });
   } catch (error) {
     next(error);
